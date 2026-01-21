@@ -30,7 +30,10 @@
     "cors": "^2.8.5",
     "express-rate-limit": "^7.1.5",
     "winston": "^3.11.0",
-    "moment": "^2.29.4"
+    "moment": "^2.29.4",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "cookie-parser": "^1.4.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",

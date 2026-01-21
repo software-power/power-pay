@@ -2,11 +2,14 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 const logger = require('./utils/logger');
 const { testConnection } = require('./config/database');
 const paymentRoutes = require('./routes/payments');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -18,12 +21,14 @@ app.use(helmet());
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
 // HTTP request logging
 if (process.env.NODE_ENV !== 'production') {
@@ -49,6 +54,8 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
 
 // Root endpoint
@@ -60,11 +67,28 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: 'GET /health',
-      verify: 'POST /api/payments/verify',
-      process: 'POST /api/payments/process',
-      status: 'GET /api/payments/status/:transaction_id',
-      history: 'GET /api/payments/history/:client_system',
-      balance: 'GET /api/payments/selcom/balance'
+      auth: {
+        login: 'POST /api/auth/login',
+        refresh: 'POST /api/auth/refresh',
+        me: 'GET /api/auth/me',
+        changePassword: 'POST /api/auth/change-password',
+        logout: 'POST /api/auth/logout'
+      },
+      users: {
+        list: 'GET /api/users',
+        get: 'GET /api/users/:id',
+        create: 'POST /api/users',
+        update: 'PUT /api/users/:id',
+        delete: 'DELETE /api/users/:id',
+        stats: 'GET /api/users/stats'
+      },
+      payments: {
+        verify: 'POST /api/payments/verify',
+        process: 'POST /api/payments/process',
+        status: 'GET /api/payments/status/:transaction_id',
+        history: 'GET /api/payments/history/:client_system',
+        balance: 'GET /api/payments/selcom/balance'
+      }
     }
   });
 });

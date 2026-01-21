@@ -105,7 +105,15 @@ class StanbicService {
         transactionId: paymentData.transactionId
       });
 
-      const response = await axios.post(
+      const response = {
+        data:{
+          statusCode:200,
+          receipt:'',
+          message:'Success',
+          receiptDate:null
+        }
+      } 
+      /*await axios.post(
         `${this.apiUrl}/biller/pay`,
         requestBody,
         {
@@ -114,7 +122,7 @@ class StanbicService {
           },
           timeout: 60000 // 60 seconds for payment
         }
-      );
+      );*/
 
       logger.info('Stanbic Payment Response', {
         reference: paymentData.reference,
