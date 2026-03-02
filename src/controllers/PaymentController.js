@@ -69,6 +69,16 @@ class PaymentController {
         mno_provider
       });
 
+      // Handle duplicate reference error
+      if (error.code === 'DUPLICATE_REFERENCE') {
+        return res.status(409).json({
+          success: false,
+          message: 'Duplicate reference number',
+          error: 'This reference has already been used. Please use a unique reference number.',
+          reference: error.reference
+        });
+      }
+
       return res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -90,7 +100,8 @@ class PaymentController {
       payer_phone,
       payer_email,
       payment_desc,
-      channel
+      channel,
+      bypass_mno  // NEW: If true, don't send to MNO, just save in database
     } = req.body;
 
     try {
@@ -101,6 +112,7 @@ class PaymentController {
       const transaction = await Transaction.create({
         transaction_id: transactionId,
         reference,
+        control_number: req.body.control_number || reference,
         mno_provider: mno_provider.toUpperCase(),
         transaction_type: 'PAYMENT',
         client_system: client_system || 'API',
@@ -114,9 +126,39 @@ class PaymentController {
         channel: channel || 'API',
         transaction_date: new Date(),
         mno_request: req.body,
-        status: 'PROCESSING'
+        status: bypass_mno ? 'PENDING' : 'PROCESSING'
       });
 
+      // If bypass_mno is true, don't send to MNO
+      if (bypass_mno) {
+        logger.info('Payment created without MNO posting (bypass enabled)', {
+          transaction_id: transactionId,
+          reference,
+          amount,
+          mno_provider: mno_provider.toUpperCase()
+        });
+
+        return res.status(200).json({
+          success: true,
+          transaction_id: transactionId,
+          reference,
+          amount,
+          mno_provider: mno_provider.toUpperCase(),
+          message: 'Payment record created. MNO posting bypassed.',
+          status: 'PENDING',
+          note: 'Transaction saved in database. No request sent to MNO. Waiting for callback update.',
+          data: {
+            transaction_id: transactionId,
+            reference,
+            amount,
+            currency: req.body.currency || 'TZS',
+            payer_name,
+            created_at: new Date().toISOString()
+          }
+        });
+      }
+
+      // Normal flow - send to MNO
       let result;
 
       // Route to appropriate MNO
@@ -197,6 +239,16 @@ class PaymentController {
         mno_provider,
         amount
       });
+
+      // Handle duplicate reference error
+      if (error.code === 'DUPLICATE_REFERENCE') {
+        return res.status(409).json({
+          success: false,
+          message: 'Duplicate reference number',
+          error: 'This reference has already been used. Please use a unique reference number.',
+          reference: error.reference
+        });
+      }
 
       return res.status(500).json({
         success: false,
@@ -358,6 +410,176 @@ class PaymentController {
       });
     }
   }
+
+  /**
+   * Lookup transaction in Power-Pay database only (for MNO to verify)
+   * Does NOT contact external MNO APIs
+   * Searches by reference number only
+   */
+  async lookupTransaction(req, res) {
+    const { reference } = req.query;
+
+    try {
+      // Reference is required
+      if (!reference) {
+        return res.status(400).json({
+          success: false,
+          message: 'Reference number is required'
+        });
+      }
+
+      // Search by reference in local database only
+      const transaction = await Transaction.findByReference(reference);
+
+      if (!transaction) {
+        return res.status(404).json({
+          success: false,
+          message: 'Transaction not found in Power-Pay database',
+          reference
+        });
+      }
+
+      // Return transaction details
+      return res.status(200).json({
+        success: true,
+        message: 'Transaction found',
+        data: {
+          transaction_id: transaction.transaction_id,
+          reference: transaction.reference,
+          amount: transaction.amount,
+          currency: transaction.currency,
+          payer_name: transaction.payer_name,
+          payer_phone: transaction.payer_phone,
+          payer_email: transaction.payer_email,
+          payment_desc: transaction.payment_desc,
+          status: transaction.status,
+          mno_provider: transaction.mno_provider,
+          client_system: transaction.client_system,
+          receipt_number: transaction.receipt_number,
+          payment_date: transaction.payment_date,
+          created_at: transaction.created_at,
+          updated_at: transaction.updated_at
+        }
+      });
+
+    } catch (error) {
+      logger.error('Lookup Transaction Error', {
+        error: error.message,
+        reference
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to lookup transaction',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Webhook/Callback endpoint for MNO to update payment status
+   * Called by MNO after customer completes payment
+   */
+  async paymentCallback(req, res) {
+    const {
+      reference,
+      amount,
+      receipt_number,
+      status,
+      payment_date,
+      payer_name,
+      payer_phone,
+      mno_provider,
+      checksum,
+      callback_data
+    } = req.body;
+
+    try {
+      // Validate checksum if provided (for security)
+      if (checksum) {
+        // TODO: Implement checksum validation based on MNO requirements
+        // const isValid = await this.validateChecksum(req.body, checksum);
+        // if (!isValid) {
+        //   return res.status(401).json({ success: false, message: 'Invalid checksum' });
+        // }
+      }
+
+      // Reference is required
+      if (!reference) {
+        return res.status(400).json({
+          success: false,
+          message: 'Reference number is required'
+        });
+      }
+
+      // Find transaction by reference
+      const transaction = await Transaction.findByReference(reference);
+
+      if (!transaction) {
+        logger.warn('Payment callback for non-existent transaction', {
+          reference
+        });
+
+        return res.status(404).json({
+          success: false,
+          message: 'Transaction not found',
+          reference
+        });
+      }
+
+      // Update transaction with callback data
+      const updateData = {
+        status: status || 'SUCCESS',
+        receipt_number: receipt_number || null,
+        payment_date: payment_date || new Date(),
+        payer_name: payer_name || transaction.payer_name,
+        payer_phone: payer_phone || transaction.payer_phone,
+        mno_provider: mno_provider || transaction.mno_provider,
+        mno_response: callback_data || req.body
+      };
+
+      const updated = await Transaction.updateFromCallback(
+        reference,
+        updateData
+      );
+
+      if (!updated) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to update transaction'
+        });
+      }
+
+      logger.info('Payment callback processed', {
+        transaction_id: transaction.transaction_id,
+        reference: reference,
+        status: status,
+        receipt: receipt_number
+      });
+
+      // Return success response
+      return res.status(200).json({
+        success: true,
+        message: 'Payment callback processed successfully',
+        transaction_id: transaction.transaction_id,
+        reference: reference,
+        status: status || 'SUCCESS'
+      });
+
+    } catch (error) {
+      logger.error('Payment Callback Error', {
+        error: error.message,
+        body: req.body
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process payment callback',
+        error: error.message
+      });
+    }
+  }
+
 }
 
 module.exports = new PaymentController();

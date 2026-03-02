@@ -4,7 +4,10 @@ const { pool, testConnection } = require('../../config/database');
 const migrations = [
   require('./001_create_transactions_table'),
   require('./002_create_mno_config_table'),
-  require('./003_create_users_table')
+  require('./003_create_users_table'),
+  require('./004_add_control_number'),
+  require('./005_add_unique_reference'),
+  require('./006_create_api_keys_table')
 ];
 
 const runMigrations = async () => {

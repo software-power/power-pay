@@ -1,0 +1,460 @@
+{
+  "info": {
+    "name": "Power-Pay Gateway API v2.1",
+    "description": "Complete API collection with MNO bypass, lookup, and callback features",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "power-pay-v2.1"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reference",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check if the Power-Pay Gateway is running"
+          }
+        },
+        {
+          "name": "Root Endpoint - List All APIs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Get all available API endpoints"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', jsonData.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments - Standard Flow",
+      "item": [
+        {
+          "name": "Verify Payment - Stanbic",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('reference', jsonData.reference);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"ABC123456\",\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "verify"]
+            },
+            "description": "Verify payment with Stanbic Bank"
+          }
+        },
+        {
+          "name": "Process Payment - Normal (Sends to MNO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('transaction_id', jsonData.transaction_id);",
+                  "    pm.collectionVariables.set('reference', jsonData.reference);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"ABC123456\",\n  \"amount\": 50000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\",\n  \"payer_name\": \"John Doe Mwamba\",\n  \"payer_phone\": \"+255712345678\",\n  \"payment_desc\": \"Hospital Bill Payment\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/process",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "process"]
+            },
+            "description": "Process payment normally - sends request to MNO"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🆕 MNO Features - Bypass & Callback",
+      "item": [
+        {
+          "name": "Process Payment - BYPASS MNO (No API call)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('transaction_id', jsonData.transaction_id);",
+                  "    pm.collectionVariables.set('reference', jsonData.reference);",
+                  "    console.log('Payment saved WITHOUT sending to MNO');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"BYPASS123\",\n  \"amount\": 75000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\",\n  \"payer_name\": \"Mary Kamwendo\",\n  \"payer_phone\": \"+255787654321\",\n  \"payment_desc\": \"Hospital Emergency Bill\",\n  \"bypass_mno\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/process",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "process"]
+            },
+            "description": "🆕 Save payment in database WITHOUT sending to MNO. Perfect for Stanbic Bank preference!"
+          }
+        },
+        {
+          "name": "Lookup Transaction by Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/lookup?reference={{reference}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "lookup"],
+              "query": [
+                {
+                  "key": "reference",
+                  "value": "{{reference}}",
+                  "description": "Payment reference number"
+                }
+              ]
+            },
+            "description": "🆕 MNO can lookup transaction in Power-Pay database using reference only"
+          }
+        },
+        {
+          "name": "Lookup - Manual Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/lookup?reference=BYPASS123",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "lookup"],
+              "query": [
+                {
+                  "key": "reference",
+                  "value": "BYPASS123"
+                }
+              ]
+            },
+            "description": "Lookup with specific reference"
+          }
+        },
+        {
+          "name": "Payment Callback (MNO → Power-Pay)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"{{reference}}\",\n  \"receipt_number\": \"RCP-2024-001\",\n  \"status\": \"SUCCESS\",\n  \"payment_date\": \"2024-01-20T11:00:00Z\",\n  \"payer_name\": \"Mary Kamwendo\",\n  \"payer_phone\": \"+255787654321\",\n  \"mno_provider\": \"STANBIC\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/callback",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "callback"]
+            },
+            "description": "🆕 MNO sends callback after customer completes payment"
+          }
+        },
+        {
+          "name": "Callback - Manual Reference",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"BYPASS123\",\n  \"receipt_number\": \"RCP-2024-999\",\n  \"status\": \"SUCCESS\",\n  \"payment_date\": \"2024-01-20T14:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/callback",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "callback"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction Queries",
+      "item": [
+        {
+          "name": "Get Transaction Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/status/{{transaction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "status", "{{transaction_id}}"]
+            },
+            "description": "Query transaction status by transaction ID"
+          }
+        },
+        {
+          "name": "Get Transaction History - Hospital",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/history/HOSPITAL_SYSTEM?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "history", "HOSPITAL_SYSTEM"],
+              "query": [{"key": "limit", "value": "50"}]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧪 Test Scenarios",
+      "item": [
+        {
+          "name": "Complete Bypass Flow",
+          "item": [
+            {
+              "name": "1. Create Payment (Bypass MNO)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Payment created without MNO call', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.status).to.equal('PENDING');",
+                      "    pm.collectionVariables.set('reference', jsonData.reference);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reference\": \"FLOW001\",\n  \"amount\": 100000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"TEST\",\n  \"payer_name\": \"Test User\",\n  \"bypass_mno\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/payments/process",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "payments", "process"]
+                }
+              }
+            },
+            {
+              "name": "2. MNO Verifies (Lookup)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Transaction found', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.success).to.be.true;",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/payments/lookup?reference={{reference}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "payments", "lookup"],
+                  "query": [{"key": "reference", "value": "{{reference}}"}]
+                }
+              }
+            },
+            {
+              "name": "3. MNO Sends Callback (SUCCESS)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Callback processed', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.status).to.equal('SUCCESS');",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reference\": \"{{reference}}\",\n  \"receipt_number\": \"RCP-TEST-001\",\n  \"status\": \"SUCCESS\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/payments/callback",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "payments", "callback"]
+                }
+              }
+            },
+            {
+              "name": "4. Verify Status Updated",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is SUCCESS', function() {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.data.status).to.equal('SUCCESS');",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/payments/lookup?reference={{reference}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "payments", "lookup"],
+                  "query": [{"key": "reference", "value": "{{reference}}"}]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Selcom Payments",
+      "item": [
+        {
+          "name": "Process - Selcom GEPG",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"991234567891\",\n  \"amount\": 15000,\n  \"mno_provider\": \"SELCOM\",\n  \"client_system\": \"UTILITY\",\n  \"payer_name\": \"Ahmed Hassan\",\n  \"payer_phone\": \"+255765432109\",\n  \"utility_code\": \"GEPG\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/process",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "process"]
+            }
+          }
+        },
+        {
+          "name": "Get Selcom Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/selcom/balance",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "selcom", "balance"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ const logger = require('./utils/logger');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 7003;
 
 // Ensure logs directory exists
 const logsDir = path.join(__dirname, '../logs');

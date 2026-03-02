@@ -26,7 +26,25 @@ const schemas = {
     currency: Joi.string().optional().length(3).default('TZS'),
     amount_type: Joi.string().optional().valid('FULL', 'FLEXIBLE', 'FIXED'),
     acc_opt: Joi.string().optional(),
-    utility_code: Joi.string().optional() // For Selcom
+    utility_code: Joi.string().optional(), // For Selcom
+    
+    // NEW: Bypass MNO posting option
+    bypass_mno: Joi.boolean().optional().default(false),
+    control_number: Joi.string().optional().max(100) // Optional control number
+  }),
+
+  // Validation schema for callback from MNO
+  mnoCallback: Joi.object({
+    reference: Joi.string().required(),
+    amount: Joi.number().positive().optional(),
+    receipt_number: Joi.string().optional(),
+    status: Joi.string().required().valid('SUCCESS', 'FAILED', 'PENDING'),
+    payment_date: Joi.string().optional(),
+    payer_name: Joi.string().optional(),
+    payer_phone: Joi.string().optional(),
+    mno_provider: Joi.string().optional(),
+    checksum: Joi.string().optional(), // For security verification
+    callback_data: Joi.object().optional() // Any additional MNO data
   })
 };
 
