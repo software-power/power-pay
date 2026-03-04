@@ -45,6 +45,31 @@ const schemas = {
     mno_provider: Joi.string().optional(),
     checksum: Joi.string().optional(), // For security verification
     callback_data: Joi.object().optional() // Any additional MNO data
+  }),
+
+  // Stanbic Lookup Request
+  stanbicLookup: Joi.object({
+    reference: Joi.string().required().min(5).max(100),
+    institutionId: Joi.string().required().max(100),
+    checksum: Joi.string().required().length(64), // SHA256 hex
+    token: Joi.string().required()
+  }),
+
+  // Stanbic Callback Request
+  stanbicCallback: Joi.object({
+    reference: Joi.string().required().min(5).max(100),
+    amount: Joi.number().required().positive(),
+    institutionId: Joi.string().required().max(100),
+    payerName: Joi.string().optional().max(255),
+    payType: Joi.string().optional().max(50),
+    amountType: Joi.string().optional().valid('FULL', 'FLEXIBLE', 'FIXED'),
+    currency: Joi.string().optional().length(3).default('TZS'),
+    paymentDesc: Joi.string().optional().max(500),
+    payerPhone: Joi.string().optional().max(20),
+    channel: Joi.string().optional().max(50),
+    transactionDate: Joi.string().optional().isoDate(),
+    transactionId: Joi.string().optional().max(100),
+    checksum: Joi.string().required().length(64) // SHA256 hex
   })
 };
 
@@ -54,6 +79,7 @@ const schemas = {
 const validate = (schemaName) => {
   return (req, res, next) => {
     const schema = schemas[schemaName];
+    console.log(process.env.STANBIC_TOKEN)
 
     if (!schema) {
       return res.status(500).json({

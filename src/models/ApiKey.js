@@ -115,7 +115,7 @@ class ApiKey {
   static async findAll(limit = 100, offset = 0) {
     const query = `
       SELECT 
-        id, key_name, api_key, organization, contact_email,
+        id, key_name, api_key,api_secret, organization, contact_email,
         contact_phone, status, permissions, rate_limit,
         expires_at, last_used_at, usage_count, created_at
       FROM api_keys 

@@ -10,6 +10,8 @@ const { testConnection } = require('./config/database');
 const paymentRoutes = require('./routes/payments');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const apiKeyRoutes = require('./routes/apiKeys');
+const stanbicRoutes = require('./routes/stanbic');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -56,6 +58,8 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/api-keys', apiKeyRoutes);
+app.use('/api/stanbic', stanbicRoutes);
 app.use('/api/payments', paymentRoutes);
 
 // Root endpoint
@@ -82,12 +86,26 @@ app.get('/', (req, res) => {
         delete: 'DELETE /api/users/:id',
         stats: 'GET /api/users/stats'
       },
+      apiKeys: {
+        list: 'GET /api/api-keys',
+        create: 'POST /api/api-keys',
+        update: 'PUT /api/api-keys/:id',
+        delete: 'DELETE /api/api-keys/:id',
+        revoke: 'POST /api/api-keys/:id/revoke',
+        stats: 'GET /api/api-keys/stats'
+      },
+      stanbic: {
+        lookup: 'POST /api/stanbic/lookup (requires API key + token)',
+        callback: 'POST /api/stanbic/callback (requires API key + checksum)'
+      },
       payments: {
-        verify: 'POST /api/payments/verify',
-        process: 'POST /api/payments/process',
-        status: 'GET /api/payments/status/:transaction_id',
-        history: 'GET /api/payments/history/:client_system',
-        balance: 'GET /api/payments/selcom/balance'
+        verify: 'POST /api/payments/verify (requires API key)',
+        process: 'POST /api/payments/process (requires API key)',
+        lookup: 'GET /api/payments/lookup?reference=xxx (requires API key)',
+        callback: 'POST /api/payments/callback (requires API key)',
+        status: 'GET /api/payments/status/:transaction_id (requires API key)',
+        history: 'GET /api/payments/history/:client_system (requires API key)',
+        balance: 'GET /api/payments/selcom/balance (requires API key)'
       }
     }
   });

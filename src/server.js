@@ -37,16 +37,16 @@ const startServer = async () => {
 ║              POWER-PAY GATEWAY SERVER                      ║
 ║   Power computer payment gateway - Multi-MNO Support       ║
 ║                                                            ║
-║  Status:  ✓ Running                                       ║
-║  Port:    ${PORT}                                              ║
-║  Env:     ${process.env.NODE_ENV || 'development'}                                      ║
+║  Status:  ✓ Running                                        ║
+║  Port:    ${PORT}                                          ║
+║  Env:     ${process.env.NODE_ENV || 'development'}         ║
 ║                                                            ║
 ║  Endpoints:                                                ║
-║  - POST   /api/payments/verify                            ║
-║  - POST   /api/payments/process                           ║
-║  - GET    /api/payments/status/:transaction_id            ║
-║  - GET    /api/payments/history/:client_system            ║
-║  - GET    /api/payments/selcom/balance                    ║
+║  - POST   /api/payments/verify                             ║
+║  - POST   /api/payments/process                            ║
+║  - GET    /api/payments/status/:transaction_id             ║
+║  - GET    /api/payments/history/:client_system             ║
+║  - GET    /api/payments/selcom/balance                     ║
 ║                                                            ║
 ║  Supported MNOs:                                           ║
 ║  - Stanbic Bank                                            ║

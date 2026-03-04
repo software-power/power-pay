@@ -1,14 +1,14 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2024-03-02T10:00:00.000Z",
+  "__export_date": "2024-03-04T10:00:00.000Z",
   "__export_source": "insomnia.desktop.app:v2023.5.8",
   "resources": [
     {
-      "_id": "wrk_power_pay_v21",
+      "_id": "wrk_power_pay_v22",
       "_type": "workspace",
-      "name": "Power-Pay Gateway API v2.1",
-      "description": "Complete API with MNO bypass, lookup, and callback features",
+      "name": "Power-Pay Gateway API v2.2",
+      "description": "Complete API with Stanbic dedicated endpoints, MNO bypass, lookup, and callback features",
       "scope": "collection"
     },
     {
@@ -18,16 +18,19 @@
       "data": {
         "base_url": "http://localhost:3000",
         "transaction_id": "",
-        "reference": "",
-        "auth_token": ""
+        "reference": "ABC123456",
+        "auth_token": "",
+        "api_key": "pk_test_1234567890abcdef1234567890abcdef12345678",
+        "stanbic_secret": "test_secret_stanbic_2024",
+        "institution_id": "BILLER001"
       },
-      "parentId": "wrk_power_pay_v21"
+      "parentId": "wrk_power_pay_v22"
     },
     {
       "_id": "fld_health",
       "_type": "request_group",
       "name": "Health & Status",
-      "parentId": "wrk_power_pay_v21"
+      "parentId": "wrk_power_pay_v22"
     },
     {
       "_id": "req_health",
@@ -46,10 +49,121 @@
       "parentId": "fld_health"
     },
     {
+      "_id": "fld_stanbic",
+      "_type": "request_group",
+      "name": "🏦 Stanbic Bank Endpoints",
+      "description": "Dedicated endpoints for Stanbic Bank integration",
+      "parentId": "wrk_power_pay_v22"
+    },
+    {
+      "_id": "req_stanbic_lookup",
+      "_type": "request",
+      "name": "Stanbic Lookup",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/stanbic/lookup",
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"reference\": \"{{ _.reference }}\",\n  \"institutionId\": \"{{ _.institution_id }}\",\n  \"checksum\": \"9f86d081884c7d659a2feaa0c55ad015\",\n  \"token\": \"{{ _.stanbic_secret }}\"\n}"
+      },
+      "description": "Verify payment reference exists in Power-Pay. Returns amount, payer details, etc.",
+      "parentId": "fld_stanbic"
+    },
+    {
+      "_id": "req_stanbic_callback",
+      "_type": "request",
+      "name": "Stanbic Callback",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/stanbic/callback",
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"reference\": \"{{ _.reference }}\",\n  \"amount\": 25000.00,\n  \"institutionId\": \"{{ _.institution_id }}\",\n  \"payerName\": \"John Doe\",\n  \"payType\": \"001\",\n  \"amountType\": \"FULL\",\n  \"currency\": \"TZS\",\n  \"paymentDesc\": \"Utility Bill Payment\",\n  \"payerPhone\": \"+255712345678\",\n  \"channel\": \"MOBILE_APP\",\n  \"transactionDate\": \"2025-08-19T13:45:30\",\n  \"transactionId\": \"TXN789654123\",\n  \"checksum\": \"9f86d081884c7d659a2feaa0c55ad015\"\n}"
+      },
+      "description": "Send payment confirmation after customer pays. Returns receipt UUID.",
+      "parentId": "fld_stanbic"
+    },
+    {
+      "_id": "fld_stanbic_test",
+      "_type": "request_group",
+      "name": "🧪 Stanbic Test Flow",
+      "description": "Complete test workflow for Stanbic integration",
+      "parentId": "wrk_power_pay_v22"
+    },
+    {
+      "_id": "req_stanbic_test_1",
+      "_type": "request",
+      "name": "1. Create Payment (Bypass)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/payments/process",
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"reference\": \"{{ _.reference }}\",\n  \"amount\": 25000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\",\n  \"payer_name\": \"John Doe\",\n  \"payer_phone\": \"+255712345678\",\n  \"payment_desc\": \"Utility Bill Payment\",\n  \"bypass_mno\": true\n}"
+      },
+      "description": "Step 1: Hospital creates payment in Power-Pay (no call to Stanbic)",
+      "parentId": "fld_stanbic_test"
+    },
+    {
+      "_id": "req_stanbic_test_2",
+      "_type": "request",
+      "name": "2. Stanbic Lookup",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/stanbic/lookup",
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"reference\": \"{{ _.reference }}\",\n  \"institutionId\": \"{{ _.institution_id }}\",\n  \"checksum\": \"9f86d081884c7d659a2feaa0c55ad015\",\n  \"token\": \"{{ _.stanbic_secret }}\"\n}"
+      },
+      "description": "Step 2: Stanbic verifies payment exists and gets details",
+      "parentId": "fld_stanbic_test"
+    },
+    {
+      "_id": "req_stanbic_test_3",
+      "_type": "request",
+      "name": "3. Stanbic Callback",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/stanbic/callback",
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"reference\": \"{{ _.reference }}\",\n  \"amount\": 25000.00,\n  \"institutionId\": \"{{ _.institution_id }}\",\n  \"payerName\": \"John Doe\",\n  \"payType\": \"001\",\n  \"amountType\": \"FULL\",\n  \"currency\": \"TZS\",\n  \"paymentDesc\": \"Utility Bill Payment\",\n  \"payerPhone\": \"+255712345678\",\n  \"channel\": \"MOBILE_APP\",\n  \"transactionDate\": \"2025-08-19T13:45:30Z\",\n  \"transactionId\": \"TXN789654123\",\n  \"checksum\": \"9f86d081884c7d659a2feaa0c55ad015\"\n}"
+      },
+      "description": "Step 3: Stanbic confirms payment processed",
+      "parentId": "fld_stanbic_test"
+    },
+    {
+      "_id": "req_stanbic_test_4",
+      "_type": "request",
+      "name": "4. Verify Transaction Updated",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/payments/lookup?reference={{ _.reference }}",
+      "headers": [
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
+      "description": "Step 4: Verify status is SUCCESS with receipt",
+      "parentId": "fld_stanbic_test"
+    },
+    {
       "_id": "fld_auth",
       "_type": "request_group",
       "name": "Authentication",
-      "parentId": "wrk_power_pay_v21"
+      "parentId": "wrk_power_pay_v22"
     },
     {
       "_id": "req_login",
@@ -68,7 +182,7 @@
       "_id": "fld_payments_standard",
       "_type": "request_group",
       "name": "Payments - Standard Flow",
-      "parentId": "wrk_power_pay_v21"
+      "parentId": "wrk_power_pay_v22"
     },
     {
       "_id": "req_verify",
@@ -76,7 +190,10 @@
       "name": "Verify Payment - Stanbic",
       "method": "POST",
       "url": "{{ _.base_url }}/api/payments/verify",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"reference\": \"ABC123456\",\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\"\n}"
@@ -89,7 +206,10 @@
       "name": "Process Payment - Normal (Sends to MNO)",
       "method": "POST",
       "url": "{{ _.base_url }}/api/payments/process",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"reference\": \"ABC123456\",\n  \"amount\": 50000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\",\n  \"payer_name\": \"John Doe Mwamba\",\n  \"payer_phone\": \"+255712345678\",\n  \"payment_desc\": \"Hospital Bill Payment\"\n}"
@@ -100,7 +220,7 @@
       "_id": "fld_mno_features",
       "_type": "request_group",
       "name": "🆕 MNO Features - Bypass & Callback",
-      "parentId": "wrk_power_pay_v21"
+      "parentId": "wrk_power_pay_v22"
     },
     {
       "_id": "req_bypass",
@@ -108,12 +228,15 @@
       "name": "Process Payment - BYPASS MNO (No API call)",
       "method": "POST",
       "url": "{{ _.base_url }}/api/payments/process",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"reference\": \"BYPASS123\",\n  \"amount\": 75000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\",\n  \"payer_name\": \"Mary Kamwendo\",\n  \"payer_phone\": \"+255787654321\",\n  \"payment_desc\": \"Hospital Emergency Bill\",\n  \"bypass_mno\": true\n}"
       },
-      "description": "🆕 Save payment in database WITHOUT sending to MNO",
+      "description": "Save payment in database WITHOUT sending to MNO",
       "parentId": "fld_mno_features"
     },
     {
@@ -122,15 +245,10 @@
       "name": "Lookup Transaction by Reference",
       "method": "GET",
       "url": "{{ _.base_url }}/api/payments/lookup?reference=BYPASS123",
-      "description": "🆕 MNO looks up transaction using reference only",
-      "parentId": "fld_mno_features"
-    },
-    {
-      "_id": "req_lookup_var",
-      "_type": "request",
-      "name": "Lookup - Using Variable",
-      "method": "GET",
-      "url": "{{ _.base_url }}/api/payments/lookup?reference={{ _.reference }}",
+      "headers": [
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
+      "description": "MNO looks up transaction using reference only",
       "parentId": "fld_mno_features"
     },
     {
@@ -139,19 +257,22 @@
       "name": "Payment Callback (MNO → Power-Pay)",
       "method": "POST",
       "url": "{{ _.base_url }}/api/payments/callback",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"reference\": \"BYPASS123\",\n  \"receipt_number\": \"RCP-2024-001\",\n  \"status\": \"SUCCESS\",\n  \"payment_date\": \"2024-01-20T11:00:00Z\",\n  \"payer_name\": \"Mary Kamwendo\",\n  \"payer_phone\": \"+255787654321\",\n  \"mno_provider\": \"STANBIC\"\n}"
+        "text": "{\n  \"reference\": \"BYPASS123\",\n  \"receipt_number\": \"RCP-2024-001234\",\n  \"status\": \"SUCCESS\",\n  \"payment_date\": \"2024-01-20T11:00:00Z\",\n  \"payer_name\": \"Mary Kamwendo\",\n  \"payer_phone\": \"+255787654321\",\n  \"mno_provider\": \"STANBIC\"\n}"
       },
-      "description": "🆕 MNO sends callback after customer pays",
+      "description": "MNO sends callback after customer pays",
       "parentId": "fld_mno_features"
     },
     {
       "_id": "fld_queries",
       "_type": "request_group",
       "name": "Transaction Queries",
-      "parentId": "wrk_power_pay_v21"
+      "parentId": "wrk_power_pay_v22"
     },
     {
       "_id": "req_status",
@@ -159,6 +280,9 @@
       "name": "Get Transaction Status",
       "method": "GET",
       "url": "{{ _.base_url }}/api/payments/status/{{ _.transaction_id }}",
+      "headers": [
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "parentId": "fld_queries"
     },
     {
@@ -167,61 +291,16 @@
       "name": "Get Transaction History",
       "method": "GET",
       "url": "{{ _.base_url }}/api/payments/history/HOSPITAL_SYSTEM?limit=50",
+      "headers": [
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "parentId": "fld_queries"
-    },
-    {
-      "_id": "fld_test_flow",
-      "_type": "request_group",
-      "name": "🧪 Complete Bypass Flow Test",
-      "parentId": "wrk_power_pay_v21"
-    },
-    {
-      "_id": "req_flow1",
-      "_type": "request",
-      "name": "1. Create Payment (Bypass MNO)",
-      "method": "POST",
-      "url": "{{ _.base_url }}/api/payments/process",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"reference\": \"FLOW001\",\n  \"amount\": 100000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"TEST\",\n  \"payer_name\": \"Test User\",\n  \"bypass_mno\": true\n}"
-      },
-      "parentId": "fld_test_flow"
-    },
-    {
-      "_id": "req_flow2",
-      "_type": "request",
-      "name": "2. MNO Verifies (Lookup)",
-      "method": "GET",
-      "url": "{{ _.base_url }}/api/payments/lookup?reference=FLOW001",
-      "parentId": "fld_test_flow"
-    },
-    {
-      "_id": "req_flow3",
-      "_type": "request",
-      "name": "3. MNO Sends Callback (SUCCESS)",
-      "method": "POST",
-      "url": "{{ _.base_url }}/api/payments/callback",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"reference\": \"FLOW001\",\n  \"receipt_number\": \"RCP-TEST-001\",\n  \"status\": \"SUCCESS\",\n  \"payment_date\": \"2024-01-20T12:00:00Z\"\n}"
-      },
-      "parentId": "fld_test_flow"
-    },
-    {
-      "_id": "req_flow4",
-      "_type": "request",
-      "name": "4. Verify Status Updated",
-      "method": "GET",
-      "url": "{{ _.base_url }}/api/payments/lookup?reference=FLOW001",
-      "parentId": "fld_test_flow"
     },
     {
       "_id": "fld_selcom",
       "_type": "request_group",
       "name": "Selcom Payments",
-      "parentId": "wrk_power_pay_v21"
+      "parentId": "wrk_power_pay_v22"
     },
     {
       "_id": "req_selcom_gepg",
@@ -229,23 +308,13 @@
       "name": "Process - Selcom GEPG",
       "method": "POST",
       "url": "{{ _.base_url }}/api/payments/process",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
+      "headers": [
+        {"name": "Content-Type", "value": "application/json"},
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"reference\": \"991234567891\",\n  \"amount\": 15000,\n  \"mno_provider\": \"SELCOM\",\n  \"client_system\": \"UTILITY\",\n  \"payer_name\": \"Ahmed Hassan\",\n  \"payer_phone\": \"+255765432109\",\n  \"utility_code\": \"GEPG\"\n}"
-      },
-      "parentId": "fld_selcom"
-    },
-    {
-      "_id": "req_selcom_gepg_bypass",
-      "_type": "request",
-      "name": "Process - Selcom GEPG (Bypass)",
-      "method": "POST",
-      "url": "{{ _.base_url }}/api/payments/process",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"reference\": \"991234567891\",\n  \"amount\": 15000,\n  \"mno_provider\": \"SELCOM\",\n  \"client_system\": \"UTILITY\",\n  \"payer_name\": \"Ahmed Hassan\",\n  \"payer_phone\": \"+255765432109\",\n  \"utility_code\": \"GEPG\",\n  \"bypass_mno\": true\n}"
       },
       "parentId": "fld_selcom"
     },
@@ -255,39 +324,26 @@
       "name": "Get Selcom Balance",
       "method": "GET",
       "url": "{{ _.base_url }}/api/payments/selcom/balance",
+      "headers": [
+        {"name": "X-API-Key", "value": "{{ _.api_key }}"}
+      ],
       "parentId": "fld_selcom"
     },
     {
-      "_id": "fld_examples",
+      "_id": "fld_checksum_helper",
       "_type": "request_group",
-      "name": "📝 Usage Examples",
-      "parentId": "wrk_power_pay_v21"
+      "name": "🔐 Checksum Helper",
+      "description": "Tools for generating checksums for Stanbic requests",
+      "parentId": "wrk_power_pay_v22"
     },
     {
-      "_id": "req_ex1",
+      "_id": "req_checksum_note",
       "_type": "request",
-      "name": "Example: Hospital Bill (Bypass)",
-      "method": "POST",
-      "url": "{{ _.base_url }}/api/payments/process",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"reference\": \"HOS-2024-001\",\n  \"amount\": 250000,\n  \"mno_provider\": \"STANBIC\",\n  \"client_system\": \"HOSPITAL_SYSTEM\",\n  \"payer_name\": \"Sarah Mtamba\",\n  \"payer_phone\": \"+255732109876\",\n  \"payment_desc\": \"Medical Treatment - Ward 5\",\n  \"bypass_mno\": true\n}"
-      },
-      "parentId": "fld_examples"
-    },
-    {
-      "_id": "req_ex2",
-      "_type": "request",
-      "name": "Example: Utility Bill (Bypass)",
-      "method": "POST",
-      "url": "{{ _.base_url }}/api/payments/process",
-      "headers": [{"name": "Content-Type", "value": "application/json"}],
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"reference\": \"UTIL-2024-500\",\n  \"amount\": 45000,\n  \"mno_provider\": \"SELCOM\",\n  \"client_system\": \"UTILITY_SYSTEM\",\n  \"payer_name\": \"Peter Mollel\",\n  \"payer_phone\": \"+255756789012\",\n  \"payment_desc\": \"Water Bill January 2024\",\n  \"utility_code\": \"GEPG\",\n  \"bypass_mno\": true\n}"
-      },
-      "parentId": "fld_examples"
+      "name": "📝 How to Generate Checksum",
+      "method": "GET",
+      "url": "{{ _.base_url }}/",
+      "description": "Generate checksum using crypto.createHmac('sha256', secret).update(JSON.stringify(data)).digest('hex')\n\nExample in Node.js:\nconst crypto = require('crypto');\nconst data = { reference: 'ABC123456', institutionId: 'BILLER001' };\nconst checksum = crypto.createHmac('sha256', 'your_secret').update(JSON.stringify(data)).digest('hex');\n\nExample in PHP:\n$data = ['reference' => 'ABC123456', 'institutionId' => 'BILLER001'];\n$checksum = hash_hmac('sha256', json_encode($data), 'your_secret');",
+      "parentId": "fld_checksum_helper"
     }
   ]
 }
