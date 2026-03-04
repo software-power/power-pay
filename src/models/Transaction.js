@@ -278,6 +278,8 @@ class Transaction {
       SET status = ?,
           receipt_number = ?,
           receipt_date = ?,
+          mno_transaction_id = ?,
+          channel = ?,
           mno_response = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE reference = ? OR control_number = ?
@@ -287,6 +289,8 @@ class Transaction {
       callbackData.status || 'SUCCESS',
       callbackData.receipt_number || null,
       callbackData.payment_date || new Date(),
+      callbackData.mno_transaction_id || null,
+      callbackData.channel || "WEB",
       JSON.stringify(callbackData),
       reference,
       reference // Check both reference and control_number

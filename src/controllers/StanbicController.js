@@ -323,6 +323,8 @@ class StanbicController {
         payment_date: transactionDate || receiptDate,
         payer_name: payerName || transaction.payer_name,
         payer_phone: payerPhone || transaction.payer_phone,
+        channel,
+        mno_transaction_id:transactionId,
         mno_provider: 'STANBIC',
         mno_response: {
           stanbic_transaction_id: transactionId,
