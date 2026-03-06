@@ -79,7 +79,6 @@ const schemas = {
 const validate = (schemaName) => {
   return (req, res, next) => {
     const schema = schemas[schemaName];
-    console.log(process.env.STANBIC_TOKEN)
 
     if (!schema) {
       return res.status(500).json({
@@ -99,6 +98,35 @@ const validate = (schemaName) => {
         message: detail.message
       }));
 
+      // Check if this is a Stanbic endpoint based on schema name
+      const isStanbicEndpoint = schemaName === 'stanbicLookup' || schemaName === 'stanbicCallback';
+
+      if (isStanbicEndpoint) {
+        // Map validation errors to Stanbic error codes
+        const firstError = error.details[0];
+        const field = firstError.path[0];
+        
+        // Map field errors to Stanbic error codes
+        const errorCodeMap = {
+          'reference': { statusCode: 203, message: 'Invalid payment reference' },
+          'token': { statusCode: 201, message: 'Invalid token' },
+          'checksum': { statusCode: 202, message: 'Invalid checksum' },
+          'institutionId': { statusCode: 400, message: 'Missing institutionId' },
+          'amount': { statusCode: 400, message: 'Invalid amount' }
+        };
+
+        const stanbicError = errorCodeMap[field] || { 
+          statusCode: 400, 
+          message: firstError.message 
+        };
+
+        return res.status(400).json({
+          statusCode: stanbicError.statusCode,
+          message: stanbicError.message
+        });
+      }
+
+      // Standard error format for non-Stanbic endpoints
       return res.status(400).json({
         success: false,
         message: 'Validation error',

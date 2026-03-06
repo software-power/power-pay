@@ -277,9 +277,10 @@ class Transaction {
       UPDATE transactions
       SET status = ?,
           receipt_number = ?,
-          receipt_date = ?,
-          mno_transaction_id = ?,
-          channel = ?,
+          payment_date = ?,
+          payer_name = COALESCE(?, payer_name),
+          payer_phone = COALESCE(?, payer_phone),
+          mno_provider = COALESCE(?, mno_provider),
           mno_response = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE reference = ? OR control_number = ?
@@ -289,9 +290,10 @@ class Transaction {
       callbackData.status || 'SUCCESS',
       callbackData.receipt_number || null,
       callbackData.payment_date || new Date(),
-      callbackData.mno_transaction_id || null,
-      callbackData.channel || "WEB",
-      JSON.stringify(callbackData),
+      callbackData.payer_name || null,
+      callbackData.payer_phone || null,
+      callbackData.mno_provider || null,
+      JSON.stringify(callbackData.mno_response || callbackData),
       reference,
       reference // Check both reference and control_number
     ];

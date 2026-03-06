@@ -48,6 +48,26 @@ const createApiKeysTable = async () => {
     );
   `;
 
+  // Create default Stanbic shared token
+  const stanbicTokenQuery = `
+    INSERT INTO api_keys (
+      key_name, api_key, api_secret, organization,
+      contact_email, status, permissions, rate_limit
+    )
+    SELECT 
+      'Stanbic Bank Shared Token', 
+      'stanbic_token_default',
+      'stanbic_secret_2024_changeme',
+      'Stanbic Bank Tanzania',
+      'api@stanbic.co.tz',
+      'ACTIVE',
+      '["stanbic:lookup", "stanbic:callback"]',
+      5000
+    WHERE NOT EXISTS (
+      SELECT 1 FROM api_keys WHERE organization = 'Stanbic Bank Tanzania'
+    );
+  `;
+
   try {
     await pool.query(query);
     console.log('✓ API keys table created successfully');
@@ -56,9 +76,13 @@ const createApiKeysTable = async () => {
     await pool.query(defaultKeyQuery);
     console.log('✓ Default test API key created');
     console.log('  API Key: pk_test_1234567890abcdef1234567890abcdef12345678');
-    console.log('  Organization: Power-Pay Test');
-    console.log('  Status: ACTIVE');
-    console.log('  ⚠️  Change this key in production!');
+    
+    // Create default Stanbic token
+    await pool.query(stanbicTokenQuery);
+    console.log('✓ Default Stanbic shared token created');
+    console.log('  Shared Secret: stanbic_secret_2024_changeme');
+    console.log('  📝 Share this secret with Stanbic team');
+    console.log('  ⚠️  Change this token in production!');
   } catch (error) {
     console.error('Error creating api_keys table:', error);
     throw error;

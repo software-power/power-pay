@@ -54,7 +54,6 @@ class StanbicController {
         
         return permissions.includes('stanbic:lookup');
       });
-      console.log(stanbicKey)
       
       return stanbicKey || null;
     } catch (error) {
@@ -84,12 +83,32 @@ class StanbicController {
         timestamp: new Date().toISOString()
       });
 
-      // Validate required fields
-      if (!reference || !institutionId || !checksum || !token) {
+      // Validate required fields - using Stanbic error format
+      if (!reference) {
+        return res.status(400).json({
+          statusCode: 203,
+          message: 'Invalid payment reference'
+        });
+      }
+
+      if (!institutionId) {
         return res.status(400).json({
           statusCode: 400,
-          message: 'Missing required fields',
-          data: null
+          message: 'Missing institutionId'
+        });
+      }
+
+      if (!token) {
+        return res.status(401).json({
+          statusCode: 201,
+          message: 'Invalid token'
+        });
+      }
+
+      if (!checksum) {
+        return res.status(401).json({
+          statusCode: 202,
+          message: 'Invalid checksum'
         });
       }
 
@@ -113,9 +132,8 @@ class StanbicController {
         });
 
         return res.status(401).json({
-          statusCode: 401,
-          message: 'Invalid token',
-          data: null
+          statusCode: 201,
+          message: 'Invalid token'
         });
       }
 
@@ -134,9 +152,8 @@ class StanbicController {
         });
 
         return res.status(401).json({
-          statusCode: 401,
-          message: 'Invalid checksum',
-          data: null
+          statusCode: 202,
+          message: 'Invalid checksum'
         });
       }
 
@@ -153,11 +170,13 @@ class StanbicController {
         });
 
         return res.status(404).json({
-          statusCode: 404,
-          message: 'Transaction not found',
-          data: null
+          statusCode: 203,
+          message: 'Invalid payment reference'
         });
       }
+
+      // Note: We allow lookup of already paid transactions
+      // Stanbic may need to verify payment details even after payment
 
       // Parse MNO request data
       let mnoRequest = {};
@@ -175,8 +194,8 @@ class StanbicController {
         amount: parseFloat(transaction.amount),
         institutionId,
         payerName: transaction.payer_name,
-        accId: mnoRequest.acc_opt || mnoRequest.accId || '001',
-        amountType: mnoRequest.amount_type || 'FULL',
+        accId: transaction.account_id || mnoRequest.accId || '001',
+        amountType: transaction.amount_type || 'FULL',
         currency: transaction.currency || 'TZS',
         paymentDesc: transaction.payment_desc || '',
         payerPhone: transaction.payer_phone || '',
@@ -251,12 +270,32 @@ class StanbicController {
         timestamp: new Date().toISOString()
       });
 
-      // Validate required fields
-      if (!reference || !amount || !institutionId || !checksum) {
+      // Validate required fields - using Stanbic error format
+      if (!reference) {
+        return res.status(400).json({
+          statusCode: 203,
+          message: 'Invalid payment reference'
+        });
+      }
+
+      if (!amount) {
         return res.status(400).json({
           statusCode: 400,
-          message: 'Missing required fields',
-          data: null
+          message: 'Invalid amount'
+        });
+      }
+
+      if (!institutionId) {
+        return res.status(400).json({
+          statusCode: 400,
+          message: 'Missing institutionId'
+        });
+      }
+
+      if (!checksum) {
+        return res.status(401).json({
+          statusCode: 202,
+          message: 'Invalid checksum'
         });
       }
 
@@ -287,9 +326,8 @@ class StanbicController {
         });
 
         return res.status(401).json({
-          statusCode: 401,
-          message: 'Invalid checksum',
-          data: null
+          statusCode: 202,
+          message: 'Invalid checksum'
         });
       }
 
@@ -306,32 +344,161 @@ class StanbicController {
         });
 
         return res.status(404).json({
-          statusCode: 404,
-          message: 'Transaction not found',
-          data: null
+          statusCode: 203,
+          message: 'Invalid payment reference'
         });
+      }
+
+      // Check if already paid - duplicate transaction
+      if (transaction.status === 'SUCCESS' && transaction.receipt_number) {
+        logger.info('Duplicate transaction in Stanbic callback', {
+          reference,
+          institutionId,
+          existingReceipt: transaction.receipt_number
+        });
+
+        // Return error 207 - transaction already paid
+        return res.status(400).json({
+          statusCode: 207,
+          message: 'Transaction reference number already paid (When posting)'
+        });
+      }
+
+      // Parse MNO request data to get amount type
+      let mnoRequest = {};
+      try {
+        mnoRequest = typeof transaction.mno_request === 'string' 
+          ? JSON.parse(transaction.mno_request) 
+          : transaction.mno_request || {};
+      } catch (e) {
+        mnoRequest = {};
+      }
+
+      const amountType = mnoRequest.amount_type || amountType || 'FULL';
+      const expectedAmount = parseFloat(transaction.amount);
+      const paidAmount = parseFloat(amount);
+
+      // Validate amount based on amount type
+      if (amountType === 'FULL' || amountType === 'FIXED') {
+        // FULL/FIXED: Must pay exact amount
+        if (paidAmount !== expectedAmount) {
+          logger.warn('Amount mismatch for FULL/FIXED payment', {
+            reference,
+            expectedAmount,
+            paidAmount,
+            amountType
+          });
+
+          return res.status(400).json({
+            statusCode: 400,
+            message: `Invalid amount. Expected ${expectedAmount}, received ${paidAmount}. Payment type ${amountType} requires exact amount.`
+          });
+        }
+      } else if (amountType === 'FLEXIBLE') {
+        // FLEXIBLE: Can pay partial amounts
+        if (paidAmount > expectedAmount) {
+          logger.warn('Overpayment for FLEXIBLE payment', {
+            reference,
+            expectedAmount,
+            paidAmount
+          });
+
+          return res.status(400).json({
+            statusCode: 400,
+            message: `Invalid amount. Cannot pay more than ${expectedAmount}.`
+          });
+        }
+
+        if (paidAmount <= 0) {
+          return res.status(400).json({
+            statusCode: 400,
+            message: 'Invalid amount. Amount must be greater than 0.'
+          });
+        }
+
+        // For FLEXIBLE payments, check if this is a partial payment
+        const totalPaid = paidAmount; // In future, sum all previous payments
+        const isFullyPaid = totalPaid >= expectedAmount;
+
+        logger.info('FLEXIBLE payment received', {
+          reference,
+          paidAmount,
+          expectedAmount,
+          totalPaid,
+          isFullyPaid
+        });
+
+        // If not fully paid, mark as PARTIAL (you may need to add this status)
+        // For now, only mark SUCCESS if fully paid
+        if (!isFullyPaid) {
+          logger.info('Partial payment received - not marking as SUCCESS', {
+            reference,
+            paidAmount,
+            expectedAmount,
+            remaining: expectedAmount - totalPaid
+          });
+
+          // You could create a PARTIAL status or track partial payments
+          // For now, we'll process it but log as partial
+        }
       }
 
       // Generate receipt ID
       const receipt = uuidv4();
       const receiptDate = new Date().toISOString();
 
+      // Calculate total paid (including this payment)
+      const previousTotalPaid = parseFloat(transaction.total_paid || 0);
+      const newTotalPaid = previousTotalPaid + paidAmount;
+      const isFullyPaid = newTotalPaid >= expectedAmount;
+
+      // Build partial payments array
+      let partialPayments = [];
+      try {
+        partialPayments = typeof transaction.partial_payments === 'string'
+          ? JSON.parse(transaction.partial_payments)
+          : transaction.partial_payments || [];
+      } catch (e) {
+        partialPayments = [];
+      }
+
+      // Add this payment to partial payments array
+      partialPayments.push({
+        receipt: receipt,
+        amount: paidAmount,
+        transactionId: transactionId,
+        transactionDate: transactionDate || receiptDate,
+        payerName: payerName,
+        channel: channel
+      });
+
+      // Determine final status based on amount type and payment
+      let finalStatus = 'SUCCESS';
+      if (amountType === 'FLEXIBLE' && !isFullyPaid) {
+        finalStatus = 'PARTIAL'; // Partial payment received
+      }
+
       // Update transaction
       const updateData = {
-        status: 'SUCCESS',
+        status: finalStatus,
         receipt_number: receipt,
         payment_date: transactionDate || receiptDate,
         payer_name: payerName || transaction.payer_name,
         payer_phone: payerPhone || transaction.payer_phone,
-        channel,
-        mno_transaction_id:transactionId,
         mno_provider: 'STANBIC',
+        total_paid: newTotalPaid,
+        payment_count: partialPayments.length,
+        is_fully_paid: isFullyPaid,
+        partial_payments: JSON.stringify(partialPayments),
         mno_response: {
           stanbic_transaction_id: transactionId,
-          amount,
+          amount: paidAmount,
+          total_paid: newTotalPaid,
+          is_fully_paid: isFullyPaid,
+          amount_type: amountType,
           institutionId,
           payType,
-          amountType,
+          amountType: amountType,
           currency,
           channel,
           transactionDate,
@@ -360,18 +527,29 @@ class StanbicController {
       logger.info('Stanbic callback processed successfully', {
         reference,
         receipt,
-        amount,
+        amount: paidAmount,
+        totalPaid: newTotalPaid,
+        isFullyPaid,
+        amountType,
         institutionId,
         transactionId
       });
 
       return res.status(200).json({
         statusCode: 200,
-        message: 'Payment processed successfully',
+        message: isFullyPaid 
+          ? 'Payment processed successfully' 
+          : 'Partial payment processed successfully',
         data: {
           reference,
           receipt,
-          receiptDate
+          receiptDate,
+          amountPaid: paidAmount,
+          totalPaid: newTotalPaid,
+          expectedAmount: expectedAmount,
+          isFullyPaid: isFullyPaid,
+          amountType: amountType,
+          remainingAmount: isFullyPaid ? 0 : (expectedAmount - newTotalPaid)
         }
       });
 
