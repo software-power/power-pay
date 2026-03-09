@@ -360,7 +360,7 @@ class StanbicController {
         // Return error 207 - transaction already paid
         return res.status(400).json({
           statusCode: 207,
-          message: 'Transaction reference number already paid (When posting)'
+          message: 'Transaction reference number already paid'
         });
       }
 
@@ -374,27 +374,28 @@ class StanbicController {
         mnoRequest = {};
       }
 
-      const amountType = mnoRequest.amount_type || amountType || 'FULL';
+      // Determine amount type from transaction data or request body
+      const transactionAmountType = mnoRequest.amount_type || amountType || 'FULL';
       const expectedAmount = parseFloat(transaction.amount);
       const paidAmount = parseFloat(amount);
 
       // Validate amount based on amount type
-      if (amountType === 'FULL' || amountType === 'FIXED') {
+      if (transactionAmountType === 'FULL' || transactionAmountType === 'FIXED') {
         // FULL/FIXED: Must pay exact amount
         if (paidAmount !== expectedAmount) {
           logger.warn('Amount mismatch for FULL/FIXED payment', {
             reference,
             expectedAmount,
             paidAmount,
-            amountType
+            amountType: transactionAmountType
           });
 
           return res.status(400).json({
             statusCode: 400,
-            message: `Invalid amount. Expected ${expectedAmount}, received ${paidAmount}. Payment type ${amountType} requires exact amount.`
+            message: `Invalid amount. Expected ${expectedAmount}, received ${paidAmount}. Payment type ${transactionAmountType} requires exact amount.`
           });
         }
-      } else if (amountType === 'FLEXIBLE') {
+      } else if (transactionAmountType === 'FLEXIBLE') {
         // FLEXIBLE: Can pay partial amounts
         if (paidAmount > expectedAmount) {
           logger.warn('Overpayment for FLEXIBLE payment', {
@@ -474,7 +475,7 @@ class StanbicController {
 
       // Determine final status based on amount type and payment
       let finalStatus = 'SUCCESS';
-      if (amountType === 'FLEXIBLE' && !isFullyPaid) {
+      if (transactionAmountType === 'FLEXIBLE' && !isFullyPaid) {
         finalStatus = 'PARTIAL'; // Partial payment received
       }
 
@@ -495,10 +496,9 @@ class StanbicController {
           amount: paidAmount,
           total_paid: newTotalPaid,
           is_fully_paid: isFullyPaid,
-          amount_type: amountType,
+          amount_type: transactionAmountType,
           institutionId,
           payType,
-          amountType: amountType,
           currency,
           channel,
           transactionDate,
@@ -519,8 +519,7 @@ class StanbicController {
 
         return res.status(500).json({
           statusCode: 500,
-          message: 'Failed to update transaction',
-          data: null
+          message: 'Failed to update transaction'
         });
       }
 
@@ -530,7 +529,7 @@ class StanbicController {
         amount: paidAmount,
         totalPaid: newTotalPaid,
         isFullyPaid,
-        amountType,
+        amountType: transactionAmountType,
         institutionId,
         transactionId
       });
@@ -548,7 +547,7 @@ class StanbicController {
           totalPaid: newTotalPaid,
           expectedAmount: expectedAmount,
           isFullyPaid: isFullyPaid,
-          amountType: amountType,
+          amountType: transactionAmountType,
           remainingAmount: isFullyPaid ? 0 : (expectedAmount - newTotalPaid)
         }
       });

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, CreditCard, Users, Settings, Zap } from 'lucide-react'
+import { LayoutDashboard, CreditCard, Users, Settings, Zap, Key } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 
 export default function Sidebar() {
@@ -9,6 +9,7 @@ export default function Sidebar() {
     { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['ADMIN', 'MANAGER', 'OPERATOR', 'VIEWER'] },
     { to: '/transactions', icon: CreditCard, label: 'Transactions', roles: ['ADMIN', 'MANAGER', 'OPERATOR'] },
     { to: '/users', icon: Users, label: 'Users', roles: ['ADMIN', 'MANAGER'] },
+    { to: '/api-keys', icon: Key, label: 'API Keys', roles: ['ADMIN', 'MANAGER'] },
     { to: '/settings', icon: Settings, label: 'Settings', roles: ['ADMIN', 'MANAGER', 'OPERATOR', 'VIEWER'] },
   ]
 

@@ -277,11 +277,15 @@ class Transaction {
       UPDATE transactions
       SET status = ?,
           receipt_number = ?,
-          payment_date = ?,
+          receipt_date = ?,
           payer_name = COALESCE(?, payer_name),
           payer_phone = COALESCE(?, payer_phone),
           mno_provider = COALESCE(?, mno_provider),
           mno_response = ?,
+          total_paid = ?,
+          payment_count = ?,
+          is_fully_paid = ?,
+          partial_payments = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE reference = ? OR control_number = ?
     `;
@@ -294,6 +298,10 @@ class Transaction {
       callbackData.payer_phone || null,
       callbackData.mno_provider || null,
       JSON.stringify(callbackData.mno_response || callbackData),
+      callbackData.total_paid || null,
+      callbackData.payment_count || null,
+      callbackData.is_fully_paid !== undefined ? callbackData.is_fully_paid : null,
+      callbackData.partial_payments || null,
       reference,
       reference // Check both reference and control_number
     ];
