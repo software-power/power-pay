@@ -70,6 +70,33 @@ const schemas = {
     transactionDate: Joi.string().optional().isoDate(),
     transactionId: Joi.string().optional().max(100),
     checksum: Joi.string().required().length(64) // SHA256 hex
+  }),
+
+  // CRDB Verification Request
+  crdbVerify: Joi.object({
+    paymentReference: Joi.string().required().min(5).max(100),
+    token: Joi.string().required(),
+    checksum: Joi.string().required().length(40), // SHA1 hex
+    institutionID: Joi.number().optional()
+  }),
+
+  // CRDB Callback Request
+  crdbCallback: Joi.object({
+    payerName: Joi.string().required().max(255),
+    amount: Joi.number().required().positive(),
+    amountType: Joi.string().optional().valid('FIXED', 'FLEXIBLE', 'FULL').default('FIXED'),
+    currency: Joi.string().optional().length(3).default('TZS'),
+    paymentReference: Joi.string().required().min(5).max(100),
+    paymentType: Joi.string().optional().max(50),
+    paymentDesc: Joi.string().optional().max(500),
+    payerID: Joi.string().optional().max(100),
+    payerMobile: Joi.string().optional().max(20),
+    transactionRef: Joi.string().required().max(100),
+    transactionChannel: Joi.string().required().max(50),
+    transactionDate: Joi.string().required(), // Format: Y-m-d H:i:s
+    token: Joi.string().required(),
+    checksum: Joi.string().required().length(40), // SHA1 hex
+    institutionID: Joi.number().optional()
   })
 };
 
@@ -100,6 +127,7 @@ const validate = (schemaName) => {
 
       // Check if this is a Stanbic endpoint based on schema name
       const isStanbicEndpoint = schemaName === 'stanbicLookup' || schemaName === 'stanbicCallback';
+      const isCrdbEndpoint = schemaName === 'crdbVerify' || schemaName === 'crdbCallback';
 
       if (isStanbicEndpoint) {
         // Map validation errors to Stanbic error codes
@@ -123,6 +151,31 @@ const validate = (schemaName) => {
         return res.status(400).json({
           statusCode: stanbicError.statusCode,
           message: stanbicError.message
+        });
+      }
+
+      if (isCrdbEndpoint) {
+        // Map validation errors to CRDB error codes
+        const firstError = error.details[0];
+        const field = firstError.path[0];
+        
+        // Map field errors to CRDB error codes
+        const errorCodeMap = {
+          'paymentReference': { status: 204, statusDesc: 'Invalid payment reference number' },
+          'token': { status: 201, statusDesc: 'Invalid token' },
+          'checksum': { status: 202, statusDesc: 'Invalid checksum' },
+          'amount': { status: 400, statusDesc: 'Invalid amount' }
+        };
+
+        const crdbError = errorCodeMap[field] || { 
+          status: 400, 
+          statusDesc: firstError.message 
+        };
+
+        return res.status(200).json({
+          status: crdbError.status,
+          statusDesc: crdbError.statusDesc,
+          data: null
         });
       }
 

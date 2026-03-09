@@ -50,6 +50,7 @@ const startServer = async () => {
 ║                                                            ║
 ║  Supported MNOs:                                           ║
 ║  - Stanbic Bank                                            ║
+║  - CRDB Bank                                               ║
 ║  - Selcom                                                  ║
 ╚════════════════════════════════════════════════════════════╝
       `);
