@@ -49,14 +49,35 @@ class CrdbController {
       //   });
       // }
 
+      // Calculate amount to return based on amount type
+      const originalAmount = parseFloat(transaction.amount);
+      const amountType = transaction.amount_type || 'FIXED';
+      let amountToReturn = originalAmount;
+
+      // For FLEXIBLE payments, return remaining amount to pay
+      if (amountType === 'FLEXIBLE') {
+        const totalPaid = parseFloat(transaction.total_paid || 0);
+        const remainingAmount = originalAmount - totalPaid;
+        
+        // If fully paid, return 0
+        amountToReturn = remainingAmount > 0 ? remainingAmount : 0;
+        
+        logger.info('CRDB FLEXIBLE payment verification', {
+          paymentReference,
+          originalAmount,
+          totalPaid,
+          remainingAmount: amountToReturn
+        });
+      }
+
       // Return verification response
       return res.status(200).json({
         status: 200,
         statusDesc: 'success',
         data: {
           payerName: transaction.payer_name,
-          amount: parseFloat(transaction.amount),
-          amountType: transaction.amount_type || 'FIXED', // FIXED, FLEXIBLE, FULL
+          amount: amountToReturn, // Return remaining amount for FLEXIBLE
+          amountType: amountType, // FIXED, FLEXIBLE, FULL
           currency: transaction.currency || 'TZS',
           paymentReference: transaction.reference,
           paymentType: transaction.transaction_type || null,

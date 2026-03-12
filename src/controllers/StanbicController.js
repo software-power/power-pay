@@ -188,14 +188,35 @@ class StanbicController {
         mnoRequest = {};
       }
 
+      // Calculate amount to return based on amount type
+      const originalAmount = parseFloat(transaction.amount);
+      const amountType = mnoRequest.amount_type || 'FULL';
+      let amountToReturn = originalAmount;
+
+      // For FLEXIBLE payments, return remaining amount to pay
+      if (amountType === 'FLEXIBLE') {
+        const totalPaid = parseFloat(transaction.total_paid || 0);
+        const remainingAmount = originalAmount - totalPaid;
+        
+        // If fully paid, return 0 (or you could return original amount with a flag)
+        amountToReturn = remainingAmount > 0 ? remainingAmount : 0;
+        
+        logger.info('FLEXIBLE payment lookup', {
+          reference,
+          originalAmount,
+          totalPaid,
+          remainingAmount: amountToReturn
+        });
+      }
+
       // Generate response data
       const responseData = {
         reference: transaction.reference,
-        amount: parseFloat(transaction.amount),
+        amount: amountToReturn, // Return remaining amount for FLEXIBLE
         institutionId,
         payerName: transaction.payer_name,
-        accId: transaction.account_id || mnoRequest.accId || '001',
-        amountType: transaction.amount_type || 'FULL',
+        accId: mnoRequest.acc_opt || mnoRequest.accId || '001',
+        amountType: amountType,
         currency: transaction.currency || 'TZS',
         paymentDesc: transaction.payment_desc || '',
         payerPhone: transaction.payer_phone || '',
@@ -360,7 +381,7 @@ class StanbicController {
         // Return error 207 - transaction already paid
         return res.status(400).json({
           statusCode: 207,
-          message: 'Transaction reference number already paid'
+          message: 'Transaction reference number already paid (When posting)'
         });
       }
 
@@ -375,7 +396,7 @@ class StanbicController {
       }
 
       // Determine amount type from transaction data or request body
-      const transactionAmountType = mnoRequest.amount_type || amountType || 'FULL';
+      const transactionAmountType = mnoRequest.amount_type || req.body.amountType || 'FULL';
       const expectedAmount = parseFloat(transaction.amount);
       const paidAmount = parseFloat(amount);
 
