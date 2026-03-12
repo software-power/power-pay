@@ -54,21 +54,29 @@ class CrdbController {
       const amountType = transaction.amount_type || 'FIXED';
       let amountToReturn = originalAmount;
 
-      // For FLEXIBLE payments, return remaining amount to pay
-      if (amountType === 'FLEXIBLE') {
+      // Calculate remaining amount for different payment types
+      if (amountType === 'FLEXIBLE' || amountType === 'INFINITY') {
         const totalPaid = parseFloat(transaction.total_paid || 0);
         const remainingAmount = originalAmount - totalPaid;
         
-        // If fully paid, return 0
-        amountToReturn = remainingAmount > 0 ? remainingAmount : 0;
+        if (amountType === 'FLEXIBLE') {
+          // FLEXIBLE: Can pay partially up to bill amount (show remaining)
+          amountToReturn = remainingAmount > 0 ? remainingAmount : 0;
+        } else if (amountType === 'INFINITY') {
+          // INFINITY: No ending, can pay any amount (show remaining but no limit)
+          amountToReturn = remainingAmount > 0 ? remainingAmount : originalAmount;
+        }
         
-        logger.info('CRDB FLEXIBLE payment verification', {
+        logger.info(`CRDB ${amountType} payment verification`, {
           paymentReference,
           originalAmount,
           totalPaid,
           remainingAmount: amountToReturn
         });
       }
+      // FULL: Show original amount (must pay >= bill amount)
+      // FIXED: Show original amount (must pay exact amount)
+      // For both, keep amountToReturn = originalAmount
 
       // Return verification response
       return res.status(200).json({
@@ -166,21 +174,33 @@ class CrdbController {
 
       // Handle different amount types
       if (transactionAmountType === 'FIXED') {
-        // Must pay exact amount
+        // FIXED: Must pay exact amount
         if (paidAmount !== expectedAmount) {
           return res.status(200).json({
             status: 400,
-            statusDesc: `Amount mismatch. Expected: ${expectedAmount}, Received: ${paidAmount}`,
+            statusDesc: `Amount mismatch. Expected exact ${expectedAmount}, Received: ${paidAmount}`,
             data: null
           });
         }
         isFullyPaid = true;
+        
+      } else if (transactionAmountType === 'FULL') {
+        // FULL: Must pay equal or greater than expected amount
+        if (paidAmount < expectedAmount) {
+          return res.status(200).json({
+            status: 400,
+            statusDesc: `Insufficient amount. Expected at least ${expectedAmount}, Received: ${paidAmount}`,
+            data: null
+          });
+        }
+        isFullyPaid = true;
+        
       } else if (transactionAmountType === 'FLEXIBLE') {
-        // Can pay less or exact (partial payments allowed)
+        // FLEXIBLE: Can pay less or exact (partial payments allowed up to bill amount)
         if (paidAmount > expectedAmount) {
           return res.status(200).json({
             status: 400,
-            statusDesc: `Amount exceeds expected. Expected: ${expectedAmount}, Received: ${paidAmount}`,
+            statusDesc: `Amount exceeds expected. Maximum ${expectedAmount}, Received: ${paidAmount}`,
             data: null
           });
         }
@@ -216,16 +236,48 @@ class CrdbController {
             payerMobile: payerMobile || null
           }
         ];
-      } else if (transactionAmountType === 'FULL') {
-        // Can pay more or exact
-        if (paidAmount < expectedAmount) {
+        
+      } else if (transactionAmountType === 'INFINITY') {
+        // INFINITY: No limit, can pay any amount (no upper bound, no ending)
+        if (paidAmount <= 0) {
           return res.status(200).json({
             status: 400,
-            statusDesc: `Insufficient amount. Expected at least: ${expectedAmount}, Received: ${paidAmount}`,
+            statusDesc: 'Invalid amount. Amount must be greater than 0.',
             data: null
           });
         }
-        isFullyPaid = true;
+
+        // Handle infinity payments (always partial, never fully paid)
+        const existingTotalPaid = parseFloat(transaction.total_paid || 0);
+        totalPaid = existingTotalPaid + paidAmount;
+        paymentCount = (transaction.payment_count || 0) + 1;
+        isFullyPaid = false; // INFINITY never fully paid
+        paymentStatus = 'PARTIAL';
+
+        // Parse existing partial payments
+        let existingPayments = [];
+        if (transaction.partial_payments) {
+          try {
+            existingPayments = typeof transaction.partial_payments === 'string' 
+              ? JSON.parse(transaction.partial_payments)
+              : transaction.partial_payments;
+          } catch (e) {
+            existingPayments = [];
+          }
+        }
+
+        // Add new payment to history
+        partialPayments = [
+          ...existingPayments,
+          {
+            amount: paidAmount,
+            transactionRef,
+            transactionDate,
+            transactionChannel,
+            payerName,
+            payerMobile: payerMobile || null
+          }
+        ];
       }
 
       // Generate receipt number

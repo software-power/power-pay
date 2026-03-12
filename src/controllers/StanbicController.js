@@ -193,21 +193,29 @@ class StanbicController {
       const amountType = transaction.amount_type || 'FULL';
       let amountToReturn = originalAmount;
 
-      // For FLEXIBLE payments, return remaining amount to pay
-      if (amountType === 'FLEXIBLE') {
+      // Calculate remaining amount for different payment types
+      if (amountType === 'FLEXIBLE' || amountType === 'INFINITY') {
         const totalPaid = parseFloat(transaction.total_paid || 0);
         const remainingAmount = originalAmount - totalPaid;
         
-        // If fully paid, return 0 (or you could return original amount with a flag)
-        amountToReturn = remainingAmount > 0 ? remainingAmount : 0;
+        if (amountType === 'FLEXIBLE') {
+          // FLEXIBLE: Can pay partially up to bill amount (show remaining)
+          amountToReturn = remainingAmount > 0 ? remainingAmount : 0;
+        } else if (amountType === 'INFINITY') {
+          // INFINITY: No ending, can pay any amount (show remaining but no limit)
+          amountToReturn = remainingAmount > 0 ? remainingAmount : originalAmount;
+        }
         
-        logger.info('FLEXIBLE payment lookup', {
+        logger.info(`${amountType} payment lookup`, {
           reference,
           originalAmount,
           totalPaid,
           remainingAmount: amountToReturn
         });
       }
+      // FULL: Show original amount (must pay >= bill amount)
+      // FIXED: Show original amount (must pay exact amount)
+      // For both, keep amountToReturn = originalAmount
 
       // Generate response data
       const responseData = {
@@ -215,7 +223,7 @@ class StanbicController {
         amount: amountToReturn, // Return remaining amount for FLEXIBLE
         institutionId,
         payerName: transaction.payer_name,
-        accId: transaction.acc_opt || transaction.accId || '001',
+        accId: transaction.account_id || transaction.accId || '001',
         amountType: amountType,
         currency: transaction.currency || 'TZS',
         paymentDesc: transaction.payment_desc || '',
@@ -401,10 +409,10 @@ class StanbicController {
       const paidAmount = parseFloat(amount);
 
       // Validate amount based on amount type
-      if (transactionAmountType === 'FULL' || transactionAmountType === 'FIXED') {
-        // FULL/FIXED: Must pay exact amount
+      if (transactionAmountType === 'FIXED') {
+        // FIXED: Must pay exact amount
         if (paidAmount !== expectedAmount) {
-          logger.warn('Amount mismatch for FULL/FIXED payment', {
+          logger.warn('Amount mismatch for FIXED payment', {
             reference,
             expectedAmount,
             paidAmount,
@@ -413,11 +421,26 @@ class StanbicController {
 
           return res.status(400).json({
             statusCode: 400,
-            message: `Invalid amount. Expected ${expectedAmount}, received ${paidAmount}. Payment type ${transactionAmountType} requires exact amount.`
+            message: `Invalid amount. Expected exact ${expectedAmount}, received ${paidAmount}.`
+          });
+        }
+      } else if (transactionAmountType === 'FULL') {
+        // FULL: Must pay equal or greater than expected amount
+        if (paidAmount < expectedAmount) {
+          logger.warn('Insufficient amount for FULL payment', {
+            reference,
+            expectedAmount,
+            paidAmount,
+            amountType: transactionAmountType
+          });
+
+          return res.status(400).json({
+            statusCode: 400,
+            message: `Invalid amount. Expected at least ${expectedAmount}, received ${paidAmount}.`
           });
         }
       } else if (transactionAmountType === 'FLEXIBLE') {
-        // FLEXIBLE: Can pay partial amounts
+        // FLEXIBLE: Can pay partial amounts up to bill amount
         if (paidAmount > expectedAmount) {
           logger.warn('Overpayment for FLEXIBLE payment', {
             reference,
@@ -463,6 +486,23 @@ class StanbicController {
           // You could create a PARTIAL status or track partial payments
           // For now, we'll process it but log as partial
         }
+      } else if (transactionAmountType === 'INFINITY') {
+        // INFINITY: No limit, can pay any amount (no upper bound)
+        if (paidAmount <= 0) {
+          return res.status(400).json({
+            statusCode: 400,
+            message: 'Invalid amount. Amount must be greater than 0.'
+          });
+        }
+
+        logger.info('INFINITY payment received', {
+          reference,
+          paidAmount,
+          expectedAmount
+        });
+        
+        // For INFINITY, there's no "fully paid" concept
+        // Payment can continue indefinitely
       }
 
       // Generate receipt ID
@@ -498,6 +538,9 @@ class StanbicController {
       let finalStatus = 'SUCCESS';
       if (transactionAmountType === 'FLEXIBLE' && !isFullyPaid) {
         finalStatus = 'PARTIAL'; // Partial payment received
+      } else if (transactionAmountType === 'INFINITY') {
+        // INFINITY always stays as PARTIAL (never fully paid)
+        finalStatus = 'PARTIAL';
       }
 
       // Update transaction

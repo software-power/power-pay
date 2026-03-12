@@ -24,7 +24,7 @@ const schemas = {
     payment_desc: Joi.string().optional().max(500),
     channel: Joi.string().optional().max(50),
     currency: Joi.string().optional().length(3).default('TZS'),
-    amount_type: Joi.string().optional().valid('FULL', 'FLEXIBLE', 'FIXED'),
+    amount_type: Joi.string().optional().valid('FULL', 'FLEXIBLE', 'FIXED', 'INFINITY'),
     acc_opt: Joi.string().optional(),
     utility_code: Joi.string().optional(), // For Selcom
     
@@ -62,7 +62,7 @@ const schemas = {
     institutionId: Joi.string().required().max(100),
     payerName: Joi.string().optional().max(255),
     payType: Joi.string().optional().max(50),
-    amountType: Joi.string().optional().valid('FULL', 'FLEXIBLE', 'FIXED'),
+    amountType: Joi.string().optional().valid('FULL', 'FLEXIBLE', 'FIXED', 'INFINITY'),
     currency: Joi.string().optional().length(3).default('TZS'),
     paymentDesc: Joi.string().optional().max(500),
     payerPhone: Joi.string().optional().max(20),
@@ -84,7 +84,7 @@ const schemas = {
   crdbCallback: Joi.object({
     payerName: Joi.string().required().max(255),
     amount: Joi.number().required().positive(),
-    amountType: Joi.string().optional().valid('FIXED', 'FLEXIBLE', 'FULL').default('FIXED'),
+    amountType: Joi.string().optional().valid('FIXED', 'FLEXIBLE', 'FULL', 'INFINITY').default('FIXED'),
     currency: Joi.string().optional().length(3).default('TZS'),
     paymentReference: Joi.string().required().min(5).max(100),
     paymentType: Joi.string().optional().max(50),
