@@ -190,7 +190,7 @@ class StanbicController {
 
       // Calculate amount to return based on amount type
       const originalAmount = parseFloat(transaction.amount);
-      const amountType = mnoRequest.amount_type || 'FULL';
+      const amountType = transaction.amount_type || 'FULL';
       let amountToReturn = originalAmount;
 
       // For FLEXIBLE payments, return remaining amount to pay
@@ -215,7 +215,7 @@ class StanbicController {
         amount: amountToReturn, // Return remaining amount for FLEXIBLE
         institutionId,
         payerName: transaction.payer_name,
-        accId: mnoRequest.acc_opt || mnoRequest.accId || '001',
+        accId: transaction.acc_opt || transaction.accId || '001',
         amountType: amountType,
         currency: transaction.currency || 'TZS',
         paymentDesc: transaction.payment_desc || '',
