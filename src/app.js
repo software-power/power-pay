@@ -14,6 +14,7 @@ const apiKeyRoutes = require('./routes/apiKeys');
 const stanbicRoutes = require('./routes/stanbic');
 const crdbRoutes = require('./routes/crdb');
 const transactionRoutes = require('./routes/transactions');
+const utilsRoutes = require('./routes/utils');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -64,6 +65,7 @@ app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/stanbic', stanbicRoutes);
 app.use('/api/crdb', crdbRoutes);
+app.use('/api/utils', utilsRoutes);
 app.use('/api/payments', paymentRoutes);
 
 // Root endpoint
